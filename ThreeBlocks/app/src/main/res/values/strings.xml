@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">ThreeBlocks</string>
+    <string name="myposition">내 위치 </string>
+    <string name="myaddress">내 주소 </string>
 </resources>

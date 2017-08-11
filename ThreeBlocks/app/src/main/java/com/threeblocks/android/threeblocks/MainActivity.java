@@ -1,15 +1,31 @@
 package com.threeblocks.android.threeblocks;
 
+import android.Manifest;
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.location.Location;
+import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.Message;
+import android.support.annotation.NonNull;
 import android.support.constraint.ConstraintLayout;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
+import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.ImageButton;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
+import com.skp.Tmap.TMapData;
 import com.skp.Tmap.TMapGpsManager;
 import com.skp.Tmap.TMapMarkerItem;
 import com.skp.Tmap.TMapPoint;
@@ -19,7 +35,9 @@ import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity implements TMapGpsManager.onLocationChangedCallback{
 
+    static final String TAG = "MainActivity";
 
+    static final int MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION = 1;
 
     static final String T_MAP_API ="f559eb18-a660-3ae4-8068-ee47c87c0984";
 
@@ -35,22 +53,41 @@ public class MainActivity extends AppCompatActivity implements TMapGpsManager.on
     private TMapView tMapView = null;
     private static int mMarkerID;
     private boolean m_bTrackingMode = true;
+    private TMapData tmapdata;
+
+    private ImageButton btn_research;
+
+    TextView myAddress;
+
 
     private ArrayList<TMapPoint> m_tmapPoint = new ArrayList<TMapPoint>();
     private ArrayList<String> mArrayMarkerID = new ArrayList<String>();
     private ArrayList<MapPoint> m_mapPoint = new ArrayList<MapPoint>();
+
     //구글 커스텀 서치 URL 형식 - 커스텀 서치 스레드 올리겠음
     //String url2 = "https://www.googleapis.com/customsearch/v1?q=" + strNoSpaces + "&key=" + key + "&cx=" + cx + "&alt=json";
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        //선언
-        ConstraintLayout constraintLayout = (ConstraintLayout)findViewById(R.id.map_view);
+        getMyLocation();
+
+        //각종 객체 선언
+        LinearLayout linearLayout = (LinearLayout) findViewById(R.id.map_view);
         tMapView = new TMapView(this);
-        constraintLayout.addView(tMapView);
+        linearLayout.addView(tMapView);
+        tmapdata = new TMapData();
+
+        myAddress = (TextView)findViewById(R.id.myAddress);
+
+        //버튼 선언 및 리스너 등록
+        BtnOnClickListener onClickListener = new BtnOnClickListener() ;
+
+        btn_research = (ImageButton) findViewById(R.id.btn_research);
+        btn_research.setOnClickListener(onClickListener);
 
         //키값
         tMapView.setSKPMapApiKey(T_MAP_API);
@@ -67,12 +104,12 @@ public class MainActivity extends AppCompatActivity implements TMapGpsManager.on
         tMapView.setLanguage(TMapView.LANGUAGE_KOREAN);
 
         /*GPS 설정*/
-        tmapgps = new TMapGpsManager(MainActivity.this);
-        tmapgps.setMinTime(1000);
-        tmapgps.setMinDistance(5);
-        tmapgps.setProvider(tmapgps.NETWORK_PROVIDER);
-        //연결된 인터넷으로 현 위치를 받음 실내일때 유용
-        tmapgps.OpenGps();
+
+        tmapgps = new TMapGpsManager(MainActivity.this); // 단말 위치탐색 클래스
+        tmapgps.setMinTime(1000); // 위치변경 인식 최소시간설정
+        tmapgps.setMinDistance(5); // 위치 변경 인식 최소거리 설정
+        tmapgps.setProvider(tmapgps.NETWORK_PROVIDER); // 네트워크 기반의 위치탐색
+
 
         /* 화면 중심을 단말의 현재 위치로 이동*/
         tMapView.setTrackingMode(true); // 화면 중심을 단말로이동
@@ -84,6 +121,24 @@ public class MainActivity extends AppCompatActivity implements TMapGpsManager.on
             public void onCalloutRightButton(TMapMarkerItem tMapMarkerItem) {
                 Toast.makeText(MainActivity.this,"click",Toast.LENGTH_SHORT)
                         .show();
+            }
+        });
+    }
+
+    private void showAddress() {
+
+        MapPoint mp = new MapPoint();
+
+        mp = UserLocation.getInstance(mContext).getMapPoint();
+        double lat = mp.getLatitude();
+        double lon = mp.getLogitude();
+
+
+        tmapdata.convertGpsToAddress(lat,lon, new TMapData.ConvertGPSToAddressListenerCallback() {
+            @Override
+            public void onConvertToGPSToAddress(String strAddress) {
+                TextView myAddress = (TextView)findViewById(R.id.myAddress);
+                myAddress.setText(strAddress);
             }
         });
     }
@@ -115,6 +170,79 @@ public class MainActivity extends AppCompatActivity implements TMapGpsManager.on
     public void onLocationChange(Location location) {
         if(m_bTrackingMode) {
             tMapView.setLocationPoint(location.getLongitude(),location.getLatitude());
+            TMapPoint tpoint = tMapView.getLocationPoint();
+
+            double Latitude = tpoint.getLatitude();
+            double Longitude = tpoint.getLongitude();
+
+            MapPoint myPoint = new MapPoint();
+            myPoint.setLatitude(Latitude);
+            myPoint.setLogitude(Longitude);
+
+            UserLocation.getInstance(mContext).setsUserLocation(myPoint);
+            showAddress();
+        }
+    }
+
+    private void getMyLocation() {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED
+                && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
+            // TODO: Consider calling
+            //    ActivityCompat#requestPermissions
+            // here to request the missing permissions, and then overriding
+            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+            //                                          int[] grantResults)
+            // to handle the case where the user grants the permission. See the documentation
+            // for ActivityCompat#requestPermissions for more details.
+
+
+            //------------------------------------------------------------------------------
+            ActivityCompat.requestPermissions(MainActivity.this,
+                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                    MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION);
+
+            return;
+        }
+    }
+
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        switch (requestCode) {
+            case MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION: {
+                // If request is cancelled, the result arrays are empty.
+                if (grantResults.length > 0
+                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    Toast.makeText(MainActivity.this,
+                            "permission was granted, :)",
+                            Toast.LENGTH_LONG).show();
+                    getMyLocation();
+
+                } else {
+                    Toast.makeText(MainActivity.this,
+                            "permission denied, ...:(",
+                            Toast.LENGTH_LONG).show();
+                }
+                return;
+            }
+
+            // other 'case' lines to check for other
+            // permissions this app might request
+        }
+    }
+
+    class BtnOnClickListener implements Button.OnClickListener {
+        @Override
+        public void onClick(View view) {
+            Message msg;
+            switch (view.getId())
+            {
+                case R.id.btn_research:
+                  tmapgps.OpenGps();
+                    break;
+            }
         }
     }
 }
