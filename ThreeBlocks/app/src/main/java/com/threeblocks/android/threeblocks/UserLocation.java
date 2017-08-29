@@ -13,7 +13,8 @@ public class UserLocation {
     private static UserLocation sUserLocation;
     public static UserLocation getInstance(Context context) {
         if(sUserLocation == null) {
-            sUserLocation = new UserLocation(context.getApplicationContext());
+            sUserLocation = new UserLocation(context);
+            //context.getApplicationoContext 시 null 값
         }
         return sUserLocation;
     }

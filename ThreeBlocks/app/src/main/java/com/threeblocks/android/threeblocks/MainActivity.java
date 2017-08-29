@@ -1,6 +1,7 @@
 package com.threeblocks.android.threeblocks;
 
 import android.Manifest;
+import android.app.Dialog;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -17,11 +18,19 @@ import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.Gravity;
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
+import android.view.inputmethod.EditorInfo;
+import android.widget.AdapterView;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -30,6 +39,9 @@ import com.skp.Tmap.TMapGpsManager;
 import com.skp.Tmap.TMapMarkerItem;
 import com.skp.Tmap.TMapPoint;
 import com.skp.Tmap.TMapView;
+import com.threeblocks.android.threeblocks.SharedPreference.QueryPreference;
+import com.threeblocks.android.threeblocks.SharedPreference.SearchAdapter;
+import com.threeblocks.android.threeblocks.SharedPreference.Utils;
 
 import java.util.ArrayList;
 
@@ -58,6 +70,10 @@ public class MainActivity extends AppCompatActivity implements TMapGpsManager.on
     private ImageButton btn_research;
 
     TextView myAddress;
+
+    private TextView searchText;
+
+    private ArrayList<String> mSearchlist;
 
 
     private ArrayList<TMapPoint> m_tmapPoint = new ArrayList<TMapPoint>();
@@ -123,6 +139,101 @@ public class MainActivity extends AppCompatActivity implements TMapGpsManager.on
                         .show();
             }
         });
+
+        searchText = (TextView) findViewById(R.id.search);
+        searchText.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                loadtoolbarSearch();
+            }
+        });
+    }
+
+    private void loadtoolbarSearch() {
+
+        ArrayList<String> searchStored = QueryPreference.getStringArrayPref(MainActivity.this,
+                Utils.PREFS_NAME,Utils.KEY_COUNTRIES);
+        mSearchlist = searchStored;
+
+
+        View view = MainActivity.this.getLayoutInflater().inflate(R.layout.view_toolbar_search, null);
+        LinearLayout parentToolbarSearch = (LinearLayout) view.findViewById(R.id.parent_toolbar_search);
+        ImageView imgToolBack = (ImageView) view.findViewById(R.id.img_tool_back);
+        final EditText edtToolSearch = (EditText) view.findViewById(R.id.edt_tool_search);
+        final ListView listSearch = (ListView) view.findViewById(R.id.list_search);
+        final TextView txtEmpty = (TextView) view.findViewById(R.id.txt_empty);
+
+
+        Utils.setListViewHeightBasedOnChildren(listSearch);
+
+        edtToolSearch.setHint("Search Please");
+
+        final Dialog toolbarSearchDialog = new Dialog(MainActivity.this, R.style.MaterialSearch);
+        toolbarSearchDialog.setContentView(view);
+        toolbarSearchDialog.setCancelable(false);
+        toolbarSearchDialog.getWindow().setLayout(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT);
+        toolbarSearchDialog.getWindow().setGravity(Gravity.BOTTOM);
+        toolbarSearchDialog.show();
+
+        toolbarSearchDialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
+
+        searchStored = (searchStored != null && searchStored.size() > 0) ? searchStored : new ArrayList<String>();
+        final SearchAdapter searchAdapter = new SearchAdapter(MainActivity.this, searchStored, false);
+
+        listSearch.setVisibility(View.VISIBLE);
+        listSearch.setAdapter(searchAdapter);
+
+        listSearch.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> adapterView, View view, int position, long l) {
+
+                String country = String.valueOf(adapterView.getItemAtPosition(position));
+                //QueryPreference.addList(MainActivity.this, Utils.PREFS_NAME, Utils.KEY_COUNTRIES, country);
+
+                edtToolSearch.setText(country);
+                listSearch.setVisibility(View.GONE);
+
+
+            }
+        });
+
+
+        imgToolBack.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                toolbarSearchDialog.dismiss();
+            }
+        });
+
+        edtToolSearch.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+
+
+                Toast.makeText(MainActivity.this,"Onclicked",Toast.LENGTH_LONG).show();
+
+            }
+        });
+
+
+        edtToolSearch.setOnEditorActionListener(new TextView.OnEditorActionListener() {
+            @Override
+            public boolean onEditorAction(TextView textView, int actionId, KeyEvent keyEvent) {
+
+                if(textView.getId()==R.id.edt_tool_search && actionId== EditorInfo.IME_ACTION_DONE){ // 뷰의 id를 식별, 키보드의 완료 키 입력 검출
+
+
+                    String query = String.valueOf(textView.getText());
+                    QueryPreference.addList(MainActivity.this,Utils.PREFS_NAME, Utils.KEY_COUNTRIES,query);
+                    //QueryPreference.setStringArrayPref(MainActivity.this, Utils.PREFS_NAME,Utils.KEY_COUNTRIES,mSearchlist);
+
+
+                }
+                return false;
+            }
+        });
+
+
     }
 
     private void showAddress() {
